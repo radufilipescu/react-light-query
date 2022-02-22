@@ -1,6 +1,8 @@
 import React, { FC, HTMLAttributes, ReactChild } from 'react';
-export { useAsyncQuery } from './useAsyncQuery';
-export { useAsyncCommand } from './useAsyncCommand';
+export { useQuery } from './useQuery';
+export { useNamedQuery } from './useNamedQuery';
+export { useMutation } from './useMutation';
+export { QueryContextProvider } from './QueryContextProvider';
 export { createResolvedPromise } from './utils/createResolvedPromise';
 export { createErroredPromise } from './utils/createErroredPromise';
 

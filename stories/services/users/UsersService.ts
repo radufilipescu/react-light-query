@@ -42,10 +42,12 @@ const DATA: IUser[] = [
 
 export class UsersService {
   async fetchListAsync(skip: number, take: number): Promise<IUser[]> {
-    return createResolvedPromise(DATA.slice(skip, skip + take), 1000);
+    console.log(`UsersService.fetchListAsync(skip: ${skip}, take: ${take})`);
+    return createResolvedPromise(DATA.slice(skip, skip + take).map(user => ({ ...user })), 1000);
   }
 
   async createAsync(name: string): Promise<void> {
+    console.log(`UsersService.createAsync(name: ${name})`);
     return createResolvedPromise(void(0), 1000)
   }
 }

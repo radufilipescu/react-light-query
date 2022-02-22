@@ -1,52 +1,94 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Meta, Story } from '@storybook/react';
-import { useRef } from '@storybook/addons';
 import { UsersService } from './services/users/UsersService';
 import { IUser } from './services/users/IUser';
-import { useAsyncCommand, useAsyncQuery } from '../src';
+import { QueryContextProvider, useMutation, useNamedQuery, useQuery } from '../src';
+import { QueryContext } from '../src/QueryContextProvider';
 
 const meta: Meta = {
-  title: 'Async Query'
+  title: 'Async Query',
 };
 
 export default meta;
 
 const TAKE = 3;
 
+const USERS_SVC = new UsersService();
+
 const DefaultTemplate: Story = args => {
-  const usersSvcRef = useRef(new UsersService());
+  const [count, setCount] = useState<number>(0);
   
   const [skip, setSkip] = useState<number>(0);
-
-  const [users, setUsers] = useState<IUser[]>([]);
-  const [isFetchingUsersList, usersListFetchingError, refreshUsersList] = useAsyncQuery/*<IUser[], [number, number], MyErrorType>*/(
-    usersSvcRef.current.fetchListAsync, [skip, TAKE], 
-    setUsers
+  const usersListQuery = useQuery/*<IUser[], [number, number], MyErrorType>*/(
+    USERS_SVC.fetchListAsync, [skip, TAKE],  
   );
 
-  const [isCreateUserExecuting, createUserError, createUserAsync] = useAsyncCommand(async () => {
-    await usersSvcRef.current.createAsync('NEW USER');
+  const [isCreateUserExecuting, createUserError, createUserAsync] = useMutation(async () => {
+    await USERS_SVC.createAsync('NEW USER');
   });
 
   return (
     <div>
+      <button onClick={() => setCount(count + 1)}>Count: {count}</button>
+      <br /><br />
       <button disabled={isCreateUserExecuting} onClick={createUserAsync}>Create</button>
       {createUserError && 'Create user Error: ' + createUserError.message}
       <br />
-      {isFetchingUsersList && <>Please wait...<br /></>}
-      <UsersList users={users} />
-      {usersListFetchingError && 'Fetch list Error: ' + usersListFetchingError.message}
+      {usersListQuery.isExecuting && <>Please wait...<br /></>}
+      {usersListQuery.data && <UsersList users={usersListQuery.data} />}
+      {usersListQuery.error && 'Fetch list Error: ' + usersListQuery.error.message}
       <br />
-      <Pagination skip={skip} take={TAKE} isExecuting={isFetchingUsersList} onRefresh={refreshUsersList} onSkipChanged={setSkip} />
+      <Pagination skip={skip} take={TAKE} isExecuting={usersListQuery.isExecuting} onRefresh={usersListQuery.startRefresh} onSkipChanged={setSkip} />
     </div>
-  )
+  );
 };
 
 // By passing using the Args format for exported stories, you can control the props for a component for reuse in a test
 // https://storybook.js.org/docs/react/workflows/unit-testing
 export const Default = DefaultTemplate.bind({});
-
 Default.args = {};
+
+function WithContextTemplateInner() {
+  const [count, setCount] = useState<number>(0);
+  
+  const [skip, setSkip] = useState<number>(0);
+  const usersListQuery = useNamedQuery/*<IUser[], [number, number], MyErrorType>*/(
+    'users-list',
+    USERS_SVC.fetchListAsync, [skip, TAKE],  
+  );
+
+  const [isCreateUserExecuting, createUserError, createUserAsync] = useMutation(async () => {
+    await USERS_SVC.createAsync('NEW USER');
+    usersListQuery.startRefresh();
+  });
+
+  return (
+    <div>
+      PANDA
+      <button onClick={() => setCount(count + 1)}>Count: {count}</button>
+      <br /><br />
+      <button disabled={isCreateUserExecuting} onClick={createUserAsync}>Create</button>
+      {createUserError && 'Create user Error: ' + createUserError.message}
+      <br />
+      {usersListQuery.isExecuting && <>Please wait...<br /></>}
+      {usersListQuery.data && <UsersList users={usersListQuery.data} />}
+      {usersListQuery.error && 'Fetch list Error: ' + usersListQuery.error.message}
+      <br />
+      <Pagination skip={skip} take={TAKE} isExecuting={usersListQuery.isExecuting} onRefresh={usersListQuery.startRefresh} onSkipChanged={setSkip} />
+    </div>
+  );
+}
+
+const WithContextTemplate: Story = args => {
+  return (
+    <QueryContextProvider>
+      <WithContextTemplateInner />
+    </QueryContextProvider>
+  );
+}
+
+export const WithContext = WithContextTemplate.bind({});
+WithContext.args = {};
 
 interface IPaginationProps {
   readonly skip: number;
@@ -83,11 +125,19 @@ interface IUsersListItemProps {
 }
 
 function UsersListItem(props: IUsersListItemProps) {
+  const ctx = useContext(QueryContext);
+  const [checked, setChecked] = useState<boolean>(props.user.isActive);
   return (
     <div style={{ borderBottom: '1px solid gray', minHeight: '120px'}}>
       #{props.user.id}
       <br /><br />
-      <input type="checkbox" defaultChecked={props.user.isActive} /> {props.user.username}
+      <input type="checkbox" checked={checked} onChange={(ev) => {
+        if (ctx) {
+          ctx.startRefresh('users-list');
+        } else {
+          setChecked(ev.target.checked);
+        }
+      }} /> {props.user.username}
     </div>
   );
 }
